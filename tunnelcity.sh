@@ -496,112 +496,24 @@ start_tunnel() {
         print_status "Running in foreground mode. Press Ctrl+C to stop."
         print_status "Configure your applications to use SOCKS5 proxy: 127.0.0.1:$LOCAL_PORT"
 
-        # First test connection to handle any interactive prompts (like password/passphrase)
+        # Start SSH tunnel once, handling passphrase interactively
+        print_status "Starting SSH tunnel in interactive mode..."
+        print_status "Configure your applications to use SOCKS5 proxy: 127.0.0.1:$LOCAL_PORT"
         echo
-        print_status "Testing SSH connection - please enter your passphrase if prompted:"
-        if ! ssh -i "$SSH_KEY" \
-            -o ConnectTimeout=10 \
+        print_status "Press Ctrl+C to stop the tunnel"
+        echo
+
+        # Run SSH in foreground to handle passphrase properly
+        # This will block until the user presses Ctrl+C or the connection fails
+        ssh -D "$LOCAL_PORT" -C -N \
+            -i "$SSH_KEY" \
+            -o ServerAliveInterval=60 \
+            -o ServerAliveCountMax=3 \
+            -o ExitOnForwardFailure=yes \
+            -o LogLevel=ERROR \
             -o UserKnownHostsFile=~/.ssh/known_hosts \
             -o StrictHostKeyChecking=yes \
-            "$SSH_USER@$SSH_HOST" \
-            "exit"; then
-            echo
-            print_error "SSH connection test failed. Please check your credentials and try again."
-            return 1
-        fi
-
-        print_status "SSH connection verified. Starting tunnel in foreground..."
-        echo
-
-        # Interactive mode with menu
-        while true; do
-            print_status "Starting SSH tunnel in interactive mode..."
-            print_status "Configure your applications to use SOCKS5 proxy: 127.0.0.1:$LOCAL_PORT"
-            echo
-
-            # Start SSH with error suppression for cleaner output
-            ssh -D "$LOCAL_PORT" -C -N \
-                -i "$SSH_KEY" \
-                -o ServerAliveInterval=60 \
-                -o ServerAliveCountMax=3 \
-                -o ExitOnForwardFailure=yes \
-                -o LogLevel=ERROR \
-                -o UserKnownHostsFile=~/.ssh/known_hosts \
-                -o StrictHostKeyChecking=yes \
-                "$SSH_USER@$SSH_HOST" &
-
-            local ssh_pid=$!
-
-            # Wait a moment to see if SSH starts successfully
-            sleep 2
-            if ! ps -p "$ssh_pid" > /dev/null 2>&1; then
-                print_error "SSH connection failed. Check your configuration."
-                return 1
-            fi
-
-            print_success "SSH tunnel established (PID: $ssh_pid)"
-            echo
-            print_warning "Tunnel Menu:"
-            echo "  [Enter] - Show this menu"
-            echo "  r - Reconnect (useful after network changes)"
-            echo "  t - Test tunnel connection"
-            echo "  s - Show tunnel status"
-            echo "  q - Quit and disconnect"
-            echo
-
-            # Wait for tunnel to disconnect or user input
-            while ps -p "$ssh_pid" > /dev/null 2>&1; do
-                read -t 1 -n 1 user_input
-                if [[ $? -eq 0 ]]; then
-                    case "$user_input" in
-                        "r")
-                            print_status "Reconnecting tunnel..."
-                            kill "$ssh_pid" 2>/dev/null
-                            wait "$ssh_pid" 2>/dev/null
-                            break
-                            ;;
-                        "t")
-                            echo
-                            test_connection_inline
-                            echo
-                            ;;
-                        "s")
-                            echo
-                            print_success "Tunnel is running (PID: $ssh_pid)"
-                            print_status "SOCKS5 proxy: 127.0.0.1:$LOCAL_PORT"
-                            echo
-                            ;;
-                        "q")
-                            print_status "Disconnecting tunnel..."
-                            kill "$ssh_pid" 2>/dev/null
-                            wait "$ssh_pid" 2>/dev/null
-                            print_success "Tunnel disconnected"
-                            return 0
-                            ;;
-                        "")
-                            echo
-                            print_warning "Tunnel Menu:"
-                            echo "  [Enter] - Show this menu"
-                            echo "  r - Reconnect (useful after network changes)"
-                            echo "  t - Test tunnel connection"
-                            echo "  s - Show tunnel status"
-                            echo "  q - Quit and disconnect"
-                            echo
-                            ;;
-                    esac
-                fi
-            done
-
-            # If we get here, SSH disconnected unexpectedly
-            print_warning "SSH connection lost. Attempting to reconnect in 3 seconds..."
-            print_status "Press 'q' and Enter to quit instead of reconnecting."
-
-            read -t 3 -n 1 user_input
-            if [[ "$user_input" == "q" ]]; then
-                print_status "User requested quit"
-                return 0
-            fi
-        done
+            "$SSH_USER@$SSH_HOST"
     fi
 }
 
