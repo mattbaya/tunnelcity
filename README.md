@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="TunnelCity Logo" width="200" height="200">
+</p>
+
 # TunnelCity
 
 Cross-platform SSH tunnel management scripts for creating SOCKS5 proxies through remote servers.
