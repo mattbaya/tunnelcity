@@ -16,6 +16,39 @@ TunnelCity provides easy-to-use scripts for establishing SSH tunnels with SOCKS5
 - ✅ Colored console output
 - ✅ Environment-based configuration
 
+## Installation
+
+### Option 1: Download from GitHub (Recommended)
+
+#### Using Git Clone
+```bash
+# Clone the repository
+git clone https://github.com/mattbaya/tunnelcity.git
+cd tunnelcity
+
+# Make scripts executable (Unix/Linux/macOS only)
+chmod +x tunnelcity.sh
+```
+
+#### Download ZIP
+1. Visit https://github.com/mattbaya/tunnelcity
+2. Click the green **Code** button
+3. Select **Download ZIP**
+4. Extract the files to your desired location
+5. For Unix/Linux/macOS: `chmod +x tunnelcity.sh`
+
+### Option 2: Direct Download
+```bash
+# Download individual files (Unix/Linux/macOS)
+curl -O https://raw.githubusercontent.com/mattbaya/tunnelcity/main/tunnelcity.sh
+curl -O https://raw.githubusercontent.com/mattbaya/tunnelcity/main/.env.example
+chmod +x tunnelcity.sh
+
+# Windows PowerShell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mattbaya/tunnelcity/main/tunnelcity.ps1" -OutFile "tunnelcity.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mattbaya/tunnelcity/main/.env.example" -OutFile ".env.example"
+```
+
 ## Quick Start
 
 ### 1. Configure Your Environment
