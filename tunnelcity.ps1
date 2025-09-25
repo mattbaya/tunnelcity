@@ -14,7 +14,7 @@ function Request-Configuration {
 
     $sshUser = Read-Host "SSH username"
     $sshHost = Read-Host "SSH server hostname/IP"
-    $localPortInput = Read-Host "Local SOCKS port [8080]"
+    $localPortInput = Read-Host "Local SOCKS port (suggested: 8080)"
     $sshKeyInput = Read-Host "SSH key file path [~/.ssh/id_ed25519]"
 
     # Set defaults

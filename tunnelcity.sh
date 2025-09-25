@@ -10,7 +10,7 @@ prompt_for_config() {
 
     read -p "SSH username: " SSH_USER_INPUT
     read -p "SSH server hostname/IP: " SSH_HOST_INPUT
-    read -p "Local SOCKS port [8080]: " LOCAL_PORT_INPUT
+    read -p "Local SOCKS port (suggested: 8080): " LOCAL_PORT_INPUT
     read -p "SSH key file path [~/.ssh/id_ed25519]: " SSH_KEY_INPUT
 
     # Set defaults
