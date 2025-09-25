@@ -65,14 +65,60 @@ Once your tunnel is running (`./tunnelcity.sh start-bg`), configure applications
 
 #### Method 2: Command Line (networksetup)
 ```bash
+# List all network services
+sudo networksetup -listallnetworkservices
+
 # Enable SOCKS proxy on Wi-Fi
-sudo networksetup -setsocksfirewallproxy Wi-Fi 127.0.0.1 8080
+sudo networksetup -setsocksfirewallproxy "Wi-Fi" 127.0.0.1 8080
 
 # Enable SOCKS proxy on Ethernet
-sudo networksetup -setsocksfirewallproxy Ethernet 127.0.0.1 8080
+sudo networksetup -setsocksfirewallproxy "Ethernet" 127.0.0.1 8080
+
+# Enable SOCKS proxy with authentication (if needed)
+sudo networksetup -setsocksfirewallproxy "Wi-Fi" 127.0.0.1 8080 off "" ""
+
+# Check current SOCKS proxy settings
+sudo networksetup -getsocksfirewallproxy "Wi-Fi"
 
 # Disable SOCKS proxy
-sudo networksetup -setsocksfirewallproxystate Wi-Fi off
+sudo networksetup -setsocksfirewallproxystate "Wi-Fi" off
+sudo networksetup -setsocksfirewallproxystate "Ethernet" off
+
+# Quick enable/disable functions (add to ~/.zshrc or ~/.bash_profile)
+proxy_on() {
+    sudo networksetup -setsocksfirewallproxy "Wi-Fi" 127.0.0.1 8080
+    echo "SOCKS proxy enabled on Wi-Fi"
+}
+
+proxy_off() {
+    sudo networksetup -setsocksfirewallproxystate "Wi-Fi" off
+    echo "SOCKS proxy disabled on Wi-Fi"
+}
+
+proxy_status() {
+    sudo networksetup -getsocksfirewallproxy "Wi-Fi"
+}
+```
+
+#### Method 3: Automating Proxy Toggle
+Create scripts for easy proxy management:
+
+**Enable Proxy Script** (`proxy-on.sh`):
+```bash
+#!/bin/bash
+# Get the primary network service
+SERVICE=$(networksetup -listnetworkserviceorder | grep -A1 "(1)" | tail -1 | sed 's/^(Hardware Port: .*, Device: .*)$//' | xargs)
+sudo networksetup -setsocksfirewallproxy "$SERVICE" 127.0.0.1 8080
+echo "✅ SOCKS proxy enabled on $SERVICE"
+```
+
+**Disable Proxy Script** (`proxy-off.sh`):
+```bash
+#!/bin/bash
+# Get the primary network service
+SERVICE=$(networksetup -listnetworkserviceorder | grep -A1 "(1)" | tail -1 | sed 's/^(Hardware Port: .*, Device: .*)$//' | xargs)
+sudo networksetup -setsocksfirewallproxystate "$SERVICE" off
+echo "❌ SOCKS proxy disabled on $SERVICE"
 ```
 
 ### Application-Specific Configuration

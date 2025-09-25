@@ -154,6 +154,57 @@ google-chrome --proxy-server="socks5://127.0.0.1:8080"
 curl --socks5 127.0.0.1:8080 https://ifconfig.me
 ```
 
+## OS-Level Proxy Configuration
+
+TunnelCity includes comprehensive guides for configuring **system-wide proxies** at the operating system level:
+
+### 🍎 **macOS System Proxy** ([README-macOS.md](README-macOS.md))
+- **GUI**: System Preferences > Network > Advanced > Proxies
+- **Command Line**: `networksetup` commands for automated control
+- **Shell Functions**: Easy proxy toggle scripts
+- **Network Location**: Automatic proxy switching
+
+### 🪟 **Windows System Proxy** ([README-Windows11.md](README-Windows11.md))
+- **GUI**: Settings > Network & Internet > Proxy
+- **PowerShell**: Registry-based proxy management functions
+- **Automation**: Scripts for easy enable/disable
+- **Third-party Tools**: Proxifier, SocksCap64 recommendations
+
+### 🐧 **Linux System Proxy** ([README-Linux.md](README-Linux.md))
+- **Environment Variables**: Export proxy settings system-wide
+- **Desktop Environments**: GNOME, KDE, XFCE configuration
+- **PAC Files**: Advanced proxy auto-configuration
+- **ProxyChains**: Force any application through the tunnel
+
+### Quick OS Proxy Commands:
+
+**macOS**:
+```bash
+# Enable
+sudo networksetup -setsocksfirewallproxy "Wi-Fi" 127.0.0.1 8080
+
+# Disable
+sudo networksetup -setsocksfirewallproxystate "Wi-Fi" off
+```
+
+**Windows**:
+```powershell
+# Enable
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name ProxyEnable -Value 1
+
+# Disable
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name ProxyEnable -Value 0
+```
+
+**Linux**:
+```bash
+# Enable
+export ALL_PROXY=socks5://127.0.0.1:8080
+
+# Disable
+unset ALL_PROXY
+```
+
 ## Platform-Specific Setup
 
 ### Windows Requirements
@@ -164,13 +215,23 @@ curl --socks5 127.0.0.1:8080 https://ifconfig.me
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
 
-See [README-Windows.md](README-Windows.md) for detailed Windows setup instructions.
+See [README-Windows11.md](README-Windows11.md) for detailed Windows setup instructions and **system-wide proxy configuration**.
 
-### Unix/Linux/macOS Requirements
+### macOS Requirements
+
+- SSH client (pre-installed)
+- Bash shell
+- Standard Unix utilities (ps, kill, etc.)
+
+See [README-macOS.md](README-macOS.md) for detailed macOS setup instructions and **system-wide proxy configuration**.
+
+### Linux Requirements
 
 - SSH client (usually pre-installed)
 - Bash shell
 - Standard Unix utilities (ps, kill, etc.)
+
+See [README-Linux.md](README-Linux.md) for detailed Linux setup instructions and **system-wide proxy configuration**.
 
 ## Troubleshooting
 
