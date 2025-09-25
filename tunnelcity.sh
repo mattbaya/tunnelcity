@@ -299,30 +299,6 @@ SSH_KEY="${SSH_KEY:-~/.ssh/id_ed25519}"
 SSH_KEY=${SSH_KEY/#\~/$HOME}
 TUNNEL_PID_FILE="/tmp/ssh_tunnel_${SSH_HOST}.pid"
 
-# Handle first-run tunnel start
-if [[ "$FIRST_RUN_START_TUNNEL" == "true" ]]; then
-    echo
-    print_status "Starting your tunnel in background mode..."
-    echo
-
-    # Check for existing tunnels
-    if check_tunnel_status; then
-        print_warning "A tunnel is already running. Use '$0 status' to check details."
-        exit 0
-    fi
-
-    # Start the tunnel
-    if start_tunnel true; then
-        echo
-        print_success "Tunnel started successfully!"
-        offer_quick_start_guide
-        touch ".tunnelcity_welcome_shown"
-    else
-        print_error "Failed to start tunnel. Check the error messages above."
-        exit 1
-    fi
-    exit 0
-fi
 
 # Function to check for port conflicts
 check_port_conflicts() {
@@ -519,6 +495,24 @@ start_tunnel() {
         # Foreground mode
         print_status "Running in foreground mode. Press Ctrl+C to stop."
         print_status "Configure your applications to use SOCKS5 proxy: 127.0.0.1:$LOCAL_PORT"
+
+        # First test connection to handle any interactive prompts (like password/passphrase)
+        echo
+        print_status "Testing SSH connection - please enter your passphrase if prompted:"
+        if ! ssh -i "$SSH_KEY" \
+            -o ConnectTimeout=10 \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            "exit"; then
+            echo
+            print_error "SSH connection test failed. Please check your credentials and try again."
+            return 1
+        fi
+
+        print_status "SSH connection verified. Starting tunnel in foreground..."
+        echo
+
         # Interactive mode with menu
         while true; do
             print_status "Starting SSH tunnel in interactive mode..."
@@ -719,6 +713,31 @@ test_tunnel() {
         return 1
     fi
 }
+
+# Handle first-run tunnel start
+if [[ "$FIRST_RUN_START_TUNNEL" == "true" ]]; then
+    echo
+    print_status "Starting your tunnel in background mode..."
+    echo
+
+    # Check for existing tunnels
+    if check_tunnel_status; then
+        print_warning "A tunnel is already running. Use '$0 status' to check details."
+        exit 0
+    fi
+
+    # Start the tunnel
+    if start_tunnel true; then
+        echo
+        print_success "Tunnel started successfully!"
+        offer_quick_start_guide
+        touch ".tunnelcity_welcome_shown"
+    else
+        print_error "Failed to start tunnel. Check the error messages above."
+        exit 1
+    fi
+    exit 0
+fi
 
 # Main script logic
 case "$1" in

@@ -515,6 +515,37 @@ function Start-Tunnel {
         Write-Status "Running in foreground mode. Press Ctrl+C to stop."
         Write-Status "Configure your applications to use SOCKS5 proxy: 127.0.0.1:$LOCAL_PORT"
 
+        # First test connection to handle any interactive prompts (like password/passphrase)
+        Write-Host
+        Write-Status "Testing SSH connection - please enter your passphrase if prompted:"
+
+        $testArgs = @(
+            "-i", $SSH_KEY,
+            "-o", "ConnectTimeout=10",
+            "-o", "UserKnownHostsFile=$($env:USERPROFILE)\.ssh\known_hosts",
+            "-o", "StrictHostKeyChecking=yes",
+            "$SSH_USER@$SSH_HOST",
+            "exit"
+        )
+
+        try {
+            $testResult = & ssh @testArgs
+            $testExitCode = $LASTEXITCODE
+            if ($testExitCode -ne 0) {
+                Write-Host
+                Write-Error "SSH connection test failed. Please check your credentials and try again."
+                return $false
+            }
+        }
+        catch {
+            Write-Host
+            Write-Error "SSH connection test failed: $($_.Exception.Message)"
+            return $false
+        }
+
+        Write-Status "SSH connection verified. Starting tunnel in foreground..."
+        Write-Host
+
         try {
             & ssh -D $LOCAL_PORT -C -N -i $SSH_KEY -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o LogLevel=ERROR -o UserKnownHostsFile="$env:USERPROFILE\.ssh\known_hosts" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST"
         }
