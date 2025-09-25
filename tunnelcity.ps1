@@ -144,9 +144,23 @@ SSH_KEY=$sshKey
     Set-Content -Path ".env" -Value $envContent -Encoding UTF8
     Write-Success "Configuration saved to .env file"
     Write-Host
+
+    # Offer to start tunnel immediately
+    Write-Status "🚀 Configuration complete! Ready to start your SSH tunnel."
+    Write-Host
+    $startTunnelNow = Read-Host "Would you like to start the tunnel now? [Y/n]"
+
+    if ($startTunnelNow -match '^[Nn]$') {
+        Write-Status "Configuration saved. Run '$(Split-Path $MyInvocation.ScriptName -Leaf) start-bg' when you're ready to connect."
+        exit 0
+    } else {
+        # Set a flag to indicate we should start the tunnel after config loading
+        $script:FirstRunStartTunnel = $true
+    }
 }
 
 # Load configuration from .env file or prompt user
+$FirstRunStartTunnel = $false
 if (Test-Path ".env") {
     Get-Content ".env" | ForEach-Object {
         if ($_ -match '^([^#].*?)=(.*)$') {
@@ -171,6 +185,32 @@ $SSH_KEY = if ($SSH_KEY) { $SSH_KEY } else { "~/.ssh/id_ed25519" }
 # Expand ~ to user profile in SSH key path
 $SSH_KEY = $SSH_KEY -replace '^~', $env:USERPROFILE
 $TUNNEL_PID_FILE = "$env:TEMP\ssh_tunnel_$SSH_HOST.pid"
+
+# Handle first-run tunnel start
+if ($FirstRunStartTunnel -eq $true) {
+    Write-Host
+    Write-Status "Starting your tunnel in background mode..."
+    Write-Host
+
+    # Check for existing tunnels
+    if (Test-TunnelStatus) {
+        Write-Warning "A tunnel is already running. Use '$(Split-Path $MyInvocation.ScriptName -Leaf) status' to check details."
+        exit 0
+    }
+
+    # Start the tunnel
+    $result = Start-Tunnel -BackgroundMode $true
+    if ($result) {
+        Write-Host
+        Write-Success "Tunnel started successfully!"
+        Show-QuickStartGuide
+        New-Item -Path ".tunnelcity_welcome_shown" -ItemType File -Force | Out-Null
+    } else {
+        Write-Error "Failed to start tunnel. Check the error messages above."
+        exit 1
+    }
+    exit 0
+}
 
 # Function to write colored output
 function Write-Status {
@@ -401,7 +441,40 @@ function Start-Tunnel {
     Write-Status "Local SOCKS proxy will be available on 127.0.0.1:$LOCAL_PORT"
 
     if ($BackgroundMode) {
-        # Background mode - use Start-Process to run SSH in background
+        # Background mode - first test connection interactively to handle password prompts
+        Write-Status "Testing SSH connection (may prompt for key passphrase)..."
+
+        # Test connection first to handle any interactive prompts (like password/passphrase)
+        Write-Host
+        Write-Status "Testing SSH connection - please enter your passphrase if prompted:"
+
+        $testArgs = @(
+            "-i", $SSH_KEY,
+            "-o", "ConnectTimeout=10",
+            "-o", "UserKnownHostsFile=$($env:USERPROFILE)\.ssh\known_hosts",
+            "-o", "StrictHostKeyChecking=yes",
+            "$SSH_USER@$SSH_HOST",
+            "exit"
+        )
+
+        try {
+            $testResult = & ssh @testArgs
+            $testExitCode = $LASTEXITCODE
+            if ($testExitCode -ne 0) {
+                Write-Host
+                Write-Error "SSH connection test failed. Please check your credentials and try again."
+                return $false
+            }
+        }
+        catch {
+            Write-Host
+            Write-Error "SSH connection test failed: $($_.Exception.Message)"
+            return $false
+        }
+
+        Write-Status "SSH connection verified. Starting tunnel in background..."
+
+        # Now start the actual tunnel in background mode
         $sshArgs = @(
             "-D", $LOCAL_PORT,
             "-C", "-N",

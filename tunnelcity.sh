@@ -265,9 +265,23 @@ EOF
 
     print_success "Configuration saved to .env file"
     echo
+
+    # Offer to start tunnel immediately
+    print_status "🚀 Configuration complete! Ready to start your SSH tunnel."
+    echo
+    read -p "Would you like to start the tunnel now? [Y/n]: " start_tunnel_now
+
+    if [[ "$start_tunnel_now" =~ ^[Nn]$ ]]; then
+        print_status "Configuration saved. Run '$0 start-bg' when you're ready to connect."
+        exit 0
+    else
+        # Set a flag to indicate we should start the tunnel after config loading
+        FIRST_RUN_START_TUNNEL=true
+    fi
 }
 
 # Load configuration from .env file or prompt user
+FIRST_RUN_START_TUNNEL=false
 if [[ -f ".env" ]]; then
     export $(cat .env | grep -v '^#' | xargs)
 else
@@ -284,6 +298,31 @@ SSH_KEY="${SSH_KEY:-~/.ssh/id_ed25519}"
 # Expand SSH key path
 SSH_KEY=${SSH_KEY/#\~/$HOME}
 TUNNEL_PID_FILE="/tmp/ssh_tunnel_${SSH_HOST}.pid"
+
+# Handle first-run tunnel start
+if [[ "$FIRST_RUN_START_TUNNEL" == "true" ]]; then
+    echo
+    print_status "Starting your tunnel in background mode..."
+    echo
+
+    # Check for existing tunnels
+    if check_tunnel_status; then
+        print_warning "A tunnel is already running. Use '$0 status' to check details."
+        exit 0
+    fi
+
+    # Start the tunnel
+    if start_tunnel true; then
+        echo
+        print_success "Tunnel started successfully!"
+        offer_quick_start_guide
+        touch ".tunnelcity_welcome_shown"
+    else
+        print_error "Failed to start tunnel. Check the error messages above."
+        exit 1
+    fi
+    exit 0
+fi
 
 # Function to check for port conflicts
 check_port_conflicts() {
@@ -428,7 +467,26 @@ start_tunnel() {
     print_status "Local SOCKS proxy will be available on 127.0.0.1:$LOCAL_PORT"
     
     if [[ "$background_mode" == "true" ]]; then
-        # Background mode
+        # Background mode - first test the connection interactively to handle password prompts
+        print_status "Testing SSH connection (may prompt for key passphrase)..."
+
+        # Test connection first to handle any interactive prompts (like password/passphrase)
+        echo
+        print_status "Testing SSH connection - please enter your passphrase if prompted:"
+        if ! ssh -i "$SSH_KEY" \
+            -o ConnectTimeout=10 \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            "exit"; then
+            echo
+            print_error "SSH connection test failed. Please check your credentials and try again."
+            return 1
+        fi
+
+        print_status "SSH connection verified. Starting tunnel in background..."
+
+        # Now start the actual tunnel in background mode
         ssh -D "$LOCAL_PORT" -C -N -f \
             -i "$SSH_KEY" \
             -o ServerAliveInterval=60 \
