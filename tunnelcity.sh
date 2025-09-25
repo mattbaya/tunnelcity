@@ -285,6 +285,122 @@ SSH_KEY="${SSH_KEY:-~/.ssh/id_ed25519}"
 SSH_KEY=${SSH_KEY/#\~/$HOME}
 TUNNEL_PID_FILE="/tmp/ssh_tunnel_${SSH_HOST}.pid"
 
+# Function to check for port conflicts
+check_port_conflicts() {
+    local port="$LOCAL_PORT"
+    local conflicts_found=false
+    local process_info
+
+    print_status "Checking for port conflicts on port $port..."
+
+    # Check if port is in use
+    if command -v lsof >/dev/null 2>&1; then
+        process_info=$(lsof -ti:"$port" 2>/dev/null)
+    elif command -v netstat >/dev/null 2>&1; then
+        # Fallback to netstat if lsof not available
+        process_info=$(netstat -tlnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1)
+    else
+        print_warning "Unable to check port conflicts (lsof/netstat not available)"
+        return 0
+    fi
+
+    if [[ -n "$process_info" ]]; then
+        echo
+        print_warning "Port $port is already in use!"
+        echo
+        echo "Processes using port $port:"
+
+        # Show detailed process information
+        for pid in $process_info; do
+            if ps -p "$pid" >/dev/null 2>&1; then
+                local process_details=$(ps -p "$pid" -o pid,ppid,user,command --no-headers 2>/dev/null)
+                local process_user=$(echo "$process_details" | awk '{print $3}')
+                local process_cmd=$(echo "$process_details" | awk '{for(i=4;i<=NF;i++) printf "%s ", $i; print ""}')
+
+                echo "  PID: $pid | User: $process_user | Command: $process_cmd"
+
+                # Check if it's an SSH tunnel
+                if echo "$process_cmd" | grep -q "ssh.*-D.*$port"; then
+                    echo "    ⚠️  This appears to be another SSH tunnel using the same port"
+                    conflicts_found=true
+                fi
+            fi
+        done
+
+        echo
+        read -p "Would you like to kill these processes? [y/N]: " kill_processes
+
+        if [[ "$kill_processes" =~ ^[Yy]$ ]]; then
+            local killed_any=false
+            for pid in $process_info; do
+                if ps -p "$pid" >/dev/null 2>&1; then
+                    local process_user=$(ps -p "$pid" -o user --no-headers 2>/dev/null | tr -d ' ')
+                    local current_user=$(whoami)
+
+                    if [[ "$process_user" == "$current_user" ]] || [[ "$current_user" == "root" ]]; then
+                        print_status "Attempting to kill process $pid (user: $process_user)..."
+
+                        # Try graceful termination first
+                        if kill "$pid" 2>/dev/null; then
+                            sleep 2
+                            if ps -p "$pid" >/dev/null 2>&1; then
+                                print_warning "Process $pid didn't stop gracefully, forcing..."
+                                kill -9 "$pid" 2>/dev/null
+                            fi
+
+                            if ! ps -p "$pid" >/dev/null 2>&1; then
+                                print_success "Successfully killed process $pid"
+                                killed_any=true
+                            else
+                                print_error "Failed to kill process $pid"
+                            fi
+                        else
+                            print_error "Failed to send signal to process $pid"
+                        fi
+                    else
+                        print_error "Cannot kill process $pid (owned by $process_user, you are $current_user)"
+                        print_status "Try running with sudo or contact the process owner"
+                    fi
+                fi
+            done
+
+            if [[ "$killed_any" == "true" ]]; then
+                sleep 1
+                print_status "Rechecking port availability..."
+
+                # Recheck if port is still in use
+                if command -v lsof >/dev/null 2>&1; then
+                    remaining_processes=$(lsof -ti:"$port" 2>/dev/null)
+                else
+                    remaining_processes=$(netstat -tlnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1)
+                fi
+
+                if [[ -z "$remaining_processes" ]]; then
+                    print_success "Port $port is now available!"
+                    return 0
+                else
+                    print_warning "Some processes are still using port $port"
+                    return 1
+                fi
+            else
+                print_error "No processes were successfully killed"
+                return 1
+            fi
+        else
+            print_warning "Port conflict not resolved. Tunnel may fail to start."
+            read -p "Continue anyway? [y/N]: " continue_anyway
+            if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+                print_status "Operation cancelled by user"
+                exit 1
+            fi
+            return 1
+        fi
+    else
+        print_success "Port $port is available"
+        return 0
+    fi
+}
+
 # Function to check if tunnel is already running
 check_tunnel_status() {
     if [[ -f "$TUNNEL_PID_FILE" ]]; then
@@ -305,6 +421,9 @@ check_tunnel_status() {
 start_tunnel() {
     local background_mode=$1
     
+    # Check for port conflicts before starting
+    check_port_conflicts
+
     print_status "Starting SSH tunnel to $SSH_USER@$SSH_HOST..."
     print_status "Local SOCKS proxy will be available on 127.0.0.1:$LOCAL_PORT"
     
@@ -477,7 +596,7 @@ show_status() {
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 {start|start-bg|stop|status|restart|test}"
+    echo "Usage: $0 {start|start-bg|stop|status|restart|test|docs|help}"
     echo ""
     echo "Commands:"
     echo "  start     - Start tunnel in foreground (interactive mode)"
@@ -486,14 +605,21 @@ show_usage() {
     echo "  status    - Show tunnel status"
     echo "  restart   - Restart the tunnel in background"
     echo "  test      - Test the tunnel connection"
+    echo "  docs      - Show available documentation"
+    echo "  help      - Show this help message"
     echo ""
     echo "Configuration:"
     echo "  SSH User: $SSH_USER"
     echo "  SSH Host: $SSH_HOST"
     echo "  Local Port: $LOCAL_PORT"
+    echo "  SSH Key: $SSH_KEY"
     echo ""
     echo "To use the tunnel, configure your applications to use:"
     echo "  SOCKS5 proxy: 127.0.0.1:$LOCAL_PORT"
+    echo ""
+    echo "Documentation:"
+    echo "  Online: https://github.com/mattbaya/tunnelcity"
+    echo "  Local:  $0 docs"
 }
 
 # Function to test connection inline (for interactive mode)

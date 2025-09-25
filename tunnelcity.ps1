@@ -210,6 +210,165 @@ function Test-SshAvailable {
     }
 }
 
+# Function to check for port conflicts
+function Test-PortConflicts {
+    Write-Status "Checking for port conflicts on port $LOCAL_PORT..."
+
+    # Get processes using the port
+    $processInfo = $null
+    try {
+        $processInfo = Get-NetTCPConnection -LocalPort $LOCAL_PORT -ErrorAction SilentlyContinue |
+                      Select-Object -ExpandProperty OwningProcess -Unique
+    }
+    catch {
+        # Fallback to netstat if Get-NetTCPConnection fails
+        try {
+            $netstatOutput = netstat -ano | Select-String ":$LOCAL_PORT "
+            if ($netstatOutput) {
+                $processInfo = $netstatOutput | ForEach-Object {
+                    ($_ -split '\s+')[-1]
+                } | Sort-Object -Unique
+            }
+        }
+        catch {
+            Write-Warning "Unable to check port conflicts (network commands not available)"
+            return $true
+        }
+    }
+
+    if ($processInfo -and $processInfo.Count -gt 0) {
+        Write-Host
+        Write-Warning "Port $LOCAL_PORT is already in use!"
+        Write-Host
+        Write-Host "Processes using port $LOCAL_PORT:"
+
+        $conflictsFound = $false
+        foreach ($pid in $processInfo) {
+            if ($pid -and $pid -ne "0") {
+                try {
+                    $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+                    if ($process) {
+                        $processUser = (Get-WmiObject -Class Win32_Process -Filter "ProcessId=$pid" -ErrorAction SilentlyContinue).GetOwner().User
+                        if (-not $processUser) { $processUser = "Unknown" }
+
+                        Write-Host "  PID: $pid | User: $processUser | Command: $($process.ProcessName) $($process.Path)"
+
+                        # Check if it's an SSH process
+                        if ($process.ProcessName -eq "ssh" -or $process.Path -like "*ssh*") {
+                            Write-Host "    ⚠️  This appears to be an SSH process using the same port" -ForegroundColor Yellow
+                            $conflictsFound = $true
+                        }
+                    }
+                }
+                catch {
+                    Write-Host "  PID: $pid | Unable to get process details"
+                }
+            }
+        }
+
+        Write-Host
+        $killProcesses = Read-Host "Would you like to kill these processes? [y/N]"
+
+        if ($killProcesses -match '^[Yy]$') {
+            $killedAny = $false
+            foreach ($pid in $processInfo) {
+                if ($pid -and $pid -ne "0") {
+                    try {
+                        $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+                        if ($process) {
+                            $processUser = (Get-WmiObject -Class Win32_Process -Filter "ProcessId=$pid" -ErrorAction SilentlyContinue).GetOwner().User
+                            $currentUser = $env:USERNAME
+
+                            # Check if we can kill the process (same user or running as admin)
+                            $canKill = $false
+                            if ($processUser -eq $currentUser -or ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+                                $canKill = $true
+                            }
+
+                            if ($canKill) {
+                                Write-Status "Attempting to kill process $pid (user: $processUser)..."
+
+                                try {
+                                    # Try graceful termination first
+                                    $process.CloseMainWindow() | Out-Null
+                                    Start-Sleep -Seconds 2
+
+                                    # Check if still running
+                                    $stillRunning = Get-Process -Id $pid -ErrorAction SilentlyContinue
+                                    if ($stillRunning) {
+                                        Write-Warning "Process $pid didn't stop gracefully, forcing..."
+                                        Stop-Process -Id $pid -Force
+                                    }
+
+                                    # Verify it's stopped
+                                    Start-Sleep -Seconds 1
+                                    $finalCheck = Get-Process -Id $pid -ErrorAction SilentlyContinue
+                                    if (-not $finalCheck) {
+                                        Write-Success "Successfully killed process $pid"
+                                        $killedAny = $true
+                                    }
+                                    else {
+                                        Write-Error "Failed to kill process $pid"
+                                    }
+                                }
+                                catch {
+                                    Write-Error "Failed to kill process $pid: $($_.Exception.Message)"
+                                }
+                            }
+                            else {
+                                Write-Error "Cannot kill process $pid (owned by $processUser, you are $currentUser)"
+                                Write-Status "Try running PowerShell as Administrator"
+                            }
+                        }
+                    }
+                    catch {
+                        Write-Error "Error processing PID $pid: $($_.Exception.Message)"
+                    }
+                }
+            }
+
+            if ($killedAny) {
+                Start-Sleep -Seconds 2
+                Write-Status "Rechecking port availability..."
+
+                # Recheck if port is still in use
+                try {
+                    $remainingProcesses = Get-NetTCPConnection -LocalPort $LOCAL_PORT -ErrorAction SilentlyContinue
+                    if (-not $remainingProcesses) {
+                        Write-Success "Port $LOCAL_PORT is now available!"
+                        return $true
+                    }
+                    else {
+                        Write-Warning "Some processes are still using port $LOCAL_PORT"
+                        return $false
+                    }
+                }
+                catch {
+                    Write-Success "Port conflict resolution completed"
+                    return $true
+                }
+            }
+            else {
+                Write-Error "No processes were successfully killed"
+                return $false
+            }
+        }
+        else {
+            Write-Warning "Port conflict not resolved. Tunnel may fail to start."
+            $continueAnyway = Read-Host "Continue anyway? [y/N]"
+            if ($continueAnyway -notmatch '^[Yy]$') {
+                Write-Status "Operation cancelled by user"
+                exit 1
+            }
+            return $false
+        }
+    }
+    else {
+        Write-Success "Port $LOCAL_PORT is available"
+        return $true
+    }
+}
+
 # Function to check if tunnel is already running
 function Test-TunnelStatus {
     if (Test-Path $TUNNEL_PID_FILE) {
@@ -234,6 +393,9 @@ function Start-Tunnel {
     if (-not (Test-SshAvailable)) {
         return $false
     }
+
+    # Check for port conflicts before starting
+    $portAvailable = Test-PortConflicts
 
     Write-Status "Starting SSH tunnel to $SSH_USER@$SSH_HOST..."
     Write-Status "Local SOCKS proxy will be available on 127.0.0.1:$LOCAL_PORT"
