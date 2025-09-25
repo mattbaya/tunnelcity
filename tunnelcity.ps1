@@ -3,9 +3,117 @@
 
 param(
     [Parameter(Position=0)]
-    [ValidateSet("start", "start-bg", "stop", "status", "restart", "test", "help")]
+    [ValidateSet("start", "start-bg", "stop", "status", "restart", "test", "docs", "help")]
     [string]$Command = "help"
 )
+
+# Function to show OS-specific quick start guide
+function Show-QuickStartGuide {
+    Write-Host
+    Write-Status "✨ Next Steps - System Proxy Configuration"
+    Write-Host
+
+    Write-Host "🧪 Windows Quick Setup:" -ForegroundColor Cyan
+    Write-Host "  1. Settings > Network & Internet > Proxy"
+    Write-Host "  2. Enable 'Use a proxy server'"
+    Write-Host "  3. Address: 127.0.0.1, Port: $LOCAL_PORT"
+    Write-Host
+    Write-Host "  Or use PowerShell:"
+    Write-Host "  Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyEnable -Value 1"
+    Write-Host
+
+    $viewDetailed = Read-Host "📚 View detailed setup guide? [y/N]"
+    if ($viewDetailed -match '^[Yy]$') {
+        if (Test-Path "README-Windows11.md") {
+            Write-Status "Opening detailed Windows setup guide..."
+            if (Get-Command less -ErrorAction SilentlyContinue) {
+                & less "README-Windows11.md"
+            } elseif (Get-Command more -ErrorAction SilentlyContinue) {
+                & more "README-Windows11.md"
+            } else {
+                Get-Content "README-Windows11.md" | Select-Object -First 100
+                Write-Host
+                Write-Status "View full guide: Get-Content README-Windows11.md | more"
+            }
+        } else {
+            Write-Status "For detailed setup: https://github.com/mattbaya/tunnelcity"
+        }
+    } else {
+        Write-Status "📌 Tip: Run '$(Split-Path $MyInvocation.ScriptName -Leaf) docs' anytime for detailed guides"
+        Write-Status "🌐 Online: https://github.com/mattbaya/tunnelcity"
+    }
+    Write-Host
+}
+
+# Function to show available documentation
+function Show-Documentation {
+    Write-Host
+    Write-Status "TunnelCity Documentation"
+    Write-Host
+    Write-Host "📚 Available Documentation:" -ForegroundColor Yellow
+    Write-Host
+
+    if (Test-Path "README.md") {
+        Write-Host "  • README.md - Main project documentation"
+    }
+
+    if (Test-Path "README-macOS.md") {
+        Write-Host "  • README-macOS.md - macOS setup and system proxy configuration"
+    }
+
+    if (Test-Path "README-Windows11.md") {
+        Write-Host "  • README-Windows11.md - Windows 11 setup and system proxy configuration"
+    }
+
+    if (Test-Path "README-Linux.md") {
+        Write-Host "  • README-Linux.md - Linux setup and system proxy configuration"
+    }
+
+    if (Test-Path "TROUBLESHOOTING.md") {
+        Write-Host "  • TROUBLESHOOTING.md - Common issues and solutions"
+    }
+
+    Write-Host
+    Write-Host "💡 Quick Commands:" -ForegroundColor Yellow
+    Write-Host "  • View file: Get-Content README-Windows11.md | more"
+    Write-Host "  • Open in browser: start README.md"
+    Write-Host "  • Online docs: https://github.com/mattbaya/tunnelcity"
+    Write-Host
+
+    $viewDocs = Read-Host "Would you like to view a specific documentation file? [y/N]"
+    if ($viewDocs -match '^[Yy]$') {
+        Write-Host
+        Write-Host "Available files:"
+        $mdFiles = Get-ChildItem -Filter "*.md" -ErrorAction SilentlyContinue
+        for ($i = 0; $i -lt $mdFiles.Count; $i++) {
+            Write-Host "  $($i + 1)) $($mdFiles[$i].Name)"
+        }
+        Write-Host
+        $docChoice = Read-Host "Enter the number or filename to view"
+
+        # Handle numeric choice
+        if ($docChoice -match '^[0-9]+$') {
+            $index = [int]$docChoice - 1
+            if ($index -ge 0 -and $index -lt $mdFiles.Count) {
+                $docFile = $mdFiles[$index].Name
+            } else {
+                $docFile = $null
+            }
+        } else {
+            $docFile = $docChoice
+        }
+
+        if ($docFile -and (Test-Path $docFile)) {
+            if (Get-Command more -ErrorAction SilentlyContinue) {
+                & more $docFile
+            } else {
+                Get-Content $docFile
+            }
+        } else {
+            Write-Error "File not found: $docFile"
+        }
+    }
+}
 
 # Function to prompt for configuration
 function Request-Configuration {
@@ -254,7 +362,7 @@ function Show-Status {
 # Function to show usage
 function Show-Usage {
     $scriptName = Split-Path $MyInvocation.ScriptName -Leaf
-    Write-Host "Usage: .$scriptName {start|start-bg|stop|status|restart|test|help}"
+    Write-Host "Usage: .$scriptName {start|start-bg|stop|status|restart|test|docs|help}"
     Write-Host ""
     Write-Host "Commands:"
     Write-Host "  start     - Start tunnel in foreground (interactive mode)"
@@ -263,19 +371,25 @@ function Show-Usage {
     Write-Host "  status    - Show tunnel status"
     Write-Host "  restart   - Restart the tunnel in background"
     Write-Host "  test      - Test the tunnel connection"
+    Write-Host "  docs      - Show available documentation"
     Write-Host "  help      - Show this help message"
     Write-Host ""
     Write-Host "Configuration:"
     Write-Host "  SSH User: $SSH_USER"
     Write-Host "  SSH Host: $SSH_HOST"
     Write-Host "  Local Port: $LOCAL_PORT"
+    Write-Host "  SSH Key: $SSH_KEY"
     Write-Host ""
     Write-Host "To use the tunnel, configure your applications to use:"
     Write-Host "  SOCKS5 proxy: 127.0.0.1:$LOCAL_PORT"
     Write-Host ""
+    Write-Host "Documentation:"
+    Write-Host "  Online: https://github.com/mattbaya/tunnelcity"
+    Write-Host "  Local:  .$scriptName docs"
+    Write-Host ""
     Write-Host "Requirements:"
     Write-Host "  - OpenSSH Client (install via Windows Features or Git for Windows)"
-    Write-Host "  - SSH key configured for $SSH_USER@$SSH_HOST"
+    Write-Host "  - SSH key configured for your server"
 }
 
 # Function to test the tunnel
@@ -331,12 +445,24 @@ switch ($Command) {
             exit 1
         }
         Start-Tunnel -BackgroundMode $false
+        # Offer documentation after initial setup
+        if (-not (Test-Path ".tunnelcity_welcome_shown")) {
+            Show-QuickStartGuide
+            New-Item -Path ".tunnelcity_welcome_shown" -ItemType File -Force | Out-Null
+        }
     }
     "start-bg" {
         if (Test-TunnelStatus) {
             exit 1
         }
-        Start-Tunnel -BackgroundMode $true
+        $result = Start-Tunnel -BackgroundMode $true
+        # Offer documentation for first-time background users
+        if (-not (Test-Path ".tunnelcity_welcome_shown") -and $result) {
+            Write-Host
+            Write-Success "Tunnel started in background!"
+            Show-QuickStartGuide
+            New-Item -Path ".tunnelcity_welcome_shown" -ItemType File -Force | Out-Null
+        }
     }
     "stop" {
         Stop-Tunnel
@@ -352,6 +478,12 @@ switch ($Command) {
     }
     "test" {
         Test-Tunnel
+    }
+    "docs" {
+        Show-Documentation
+    }
+    "help" {
+        Show-Usage
     }
     default {
         Show-Usage

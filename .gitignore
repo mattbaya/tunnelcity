@@ -1,6 +1,9 @@
 # Environment configuration
 .env
 
+# TunnelCity generated files
+.tunnelcity_welcome_shown
+
 # OS generated files
 .DS_Store
 .DS_Store?
