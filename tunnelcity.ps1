@@ -163,14 +163,14 @@ SSH_KEY=$sshKey
 $FirstRunStartTunnel = $false
 if (Test-Path ".env") {
     Get-Content ".env" | ForEach-Object {
-        if ($_ -match '^([^#].*?)=(.*)$') {
+        if ($_ -match '^(.+?)=(.*)$' -and $_ -notmatch '^\s*#') {
             Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
         }
     }
 } else {
     Request-Configuration
     Get-Content ".env" | ForEach-Object {
-        if ($_ -match '^([^#].*?)=(.*)$') {
+        if ($_ -match '^(.+?)=(.*)$' -and $_ -notmatch '^\s*#') {
             Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
         }
     }
@@ -352,7 +352,7 @@ function Test-PortConflicts {
                                     }
                                 }
                                 catch {
-                                    Write-Error "Failed to kill process $pid: $($_.Exception.Message)"
+                                    Write-Error "Failed to kill process ${pid}: $($PSItem.Exception.Message)"
                                 }
                             }
                             else {
@@ -362,7 +362,7 @@ function Test-PortConflicts {
                         }
                     }
                     catch {
-                        Write-Error "Error processing PID $pid: $($_.Exception.Message)"
+                        Write-Error "Error processing PID $pid: $($PSItem.Exception.Message)"
                     }
                 }
             }
@@ -468,7 +468,7 @@ function Start-Tunnel {
         }
         catch {
             Write-Host
-            Write-Error "SSH connection test failed: $($_.Exception.Message)"
+            Write-Error "SSH connection test failed: $($PSItem.Exception.Message)"
             return $false
         }
 
@@ -506,7 +506,7 @@ function Start-Tunnel {
             }
         }
         catch {
-            Write-Error "Failed to start SSH tunnel: $($_.Exception.Message)"
+            Write-Error "Failed to start SSH tunnel: $($PSItem.Exception.Message)"
             return $false
         }
     }
@@ -526,7 +526,7 @@ function Start-Tunnel {
             & ssh -D $LOCAL_PORT -C -N -i $SSH_KEY -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o LogLevel=ERROR -o UserKnownHostsFile="$env:USERPROFILE\.ssh\known_hosts" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST"
         }
         catch {
-            Write-Error "SSH tunnel failed: $($_.Exception.Message)"
+            Write-Error "SSH tunnel failed: $($PSItem.Exception.Message)"
             return $false
         }
     }
@@ -567,7 +567,7 @@ function Start-TunnelDetachable {
         return $true
     }
     catch {
-        Write-Error "Failed to start detachable tunnel: $($_.Exception.Message)"
+        Write-Error "Failed to start detachable tunnel: $($PSItem.Exception.Message)"
         Write-Status "Falling back to background mode..."
         return Start-Tunnel -BackgroundMode $true
     }
@@ -587,7 +587,7 @@ function Stop-Tunnel {
                     Write-Success "Tunnel stopped"
                 }
                 catch {
-                    Write-Error "Failed to stop process: $($_.Exception.Message)"
+                    Write-Error "Failed to stop process: $($PSItem.Exception.Message)"
                 }
             }
             else {
@@ -600,10 +600,10 @@ function Stop-Tunnel {
         Write-Warning "No tunnel PID file found. Trying to find and kill SSH processes..."
         try {
             Get-Process -Name ssh -ErrorAction SilentlyContinue |
-                Where-Object { $_.CommandLine -like "*-D $LOCAL_PORT*$SSH_USER@$SSH_HOST*" } |
+                Where-Object { $PSItem.CommandLine -like "*-D $LOCAL_PORT*$SSH_USER@$SSH_HOST*" } |
                 ForEach-Object {
-                    Write-Status "Stopping SSH process (PID: $($_.Id))"
-                    Stop-Process -Id $_.Id -Force
+                    Write-Status "Stopping SSH process (PID: $($PSItem.Id))"
+                    Stop-Process -Id $PSItem.Id -Force
                 }
         }
         catch {
@@ -716,7 +716,7 @@ function Test-Tunnel {
         }
     }
     catch {
-        Write-Error "Tunnel test failed: $($_.Exception.Message)"
+        Write-Error "Tunnel test failed: $($PSItem.Exception.Message)"
         return $false
     }
 }
