@@ -560,17 +560,18 @@ show_status() {
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 {start|start-bg|stop|status|restart|test|docs|help}"
+    echo "Usage: $0 {start|start-bg|start-detach|stop|status|restart|test|docs|help}"
     echo ""
     echo "Commands:"
-    echo "  start     - Start tunnel in foreground (interactive mode)"
-    echo "  start-bg  - Start tunnel in background"
-    echo "  stop      - Stop the tunnel"
-    echo "  status    - Show tunnel status"
-    echo "  restart   - Restart the tunnel in background"
-    echo "  test      - Test the tunnel connection"
-    echo "  docs      - Show available documentation"
-    echo "  help      - Show this help message"
+    echo "  start        - Start tunnel in foreground (interactive mode)"
+    echo "  start-bg     - Start tunnel in background"
+    echo "  start-detach - Start tunnel in detachable session (tmux/screen)"
+    echo "  stop         - Stop the tunnel"
+    echo "  status       - Show tunnel status"
+    echo "  restart      - Restart the tunnel in background"
+    echo "  test         - Test the tunnel connection"
+    echo "  docs         - Show available documentation"
+    echo "  help         - Show this help message"
     echo ""
     echo "Configuration:"
     echo "  SSH User: $SSH_USER"
@@ -626,6 +627,79 @@ test_tunnel() {
     fi
 }
 
+# Function to start tunnel in a detachable session
+start_tunnel_detachable() {
+    print_status "Starting detachable SSH tunnel..."
+
+    # Check if screen or tmux is available
+    local session_manager=""
+    if command -v tmux >/dev/null 2>&1; then
+        session_manager="tmux"
+    elif command -v screen >/dev/null 2>&1; then
+        session_manager="screen"
+    else
+        print_error "Neither tmux nor screen is installed."
+        print_status "Install with: brew install tmux  (or)  brew install screen"
+        print_status "Falling back to background mode..."
+        start_tunnel true
+        return $?
+    fi
+
+    local session_name="tunnelcity-$SSH_HOST"
+
+    print_status "Using $session_manager for detachable session"
+    print_status "Local SOCKS proxy will be available on 127.0.0.1:$LOCAL_PORT"
+    echo
+
+    # Check for existing session
+    if [[ "$session_manager" == "tmux" ]]; then
+        if tmux has-session -t "$session_name" 2>/dev/null; then
+            print_warning "Session '$session_name' already exists"
+            print_status "Attach with: tmux attach -t $session_name"
+            return 1
+        fi
+    else
+        if screen -list | grep -q "$session_name"; then
+            print_warning "Screen session '$session_name' already exists"
+            print_status "Attach with: screen -r $session_name"
+            return 1
+        fi
+    fi
+
+    # Create SSH command
+    local ssh_cmd="ssh -D $LOCAL_PORT -C -N -i '$SSH_KEY' -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o LogLevel=ERROR -o UserKnownHostsFile=~/.ssh/known_hosts -o StrictHostKeyChecking=yes '$SSH_USER@$SSH_HOST'"
+
+    print_status "Creating detachable session..."
+    print_status "After entering your SSH passphrase, you can detach with:"
+    if [[ "$session_manager" == "tmux" ]]; then
+        print_status "  Detach: Ctrl+B, then D"
+        print_status "  Reattach: tmux attach -t $session_name"
+        print_status "  Kill session: tmux kill-session -t $session_name"
+        echo
+
+        # Start tmux session
+        tmux new-session -d -s "$session_name" "$ssh_cmd"
+        print_success "Tunnel started in tmux session '$session_name'"
+        print_status "Attaching to session (detach with Ctrl+B, then D)..."
+        sleep 2
+        tmux attach -t "$session_name"
+    else
+        print_status "  Detach: Ctrl+A, then D"
+        print_status "  Reattach: screen -r $session_name"
+        print_status "  Kill session: screen -S $session_name -X quit"
+        echo
+
+        # Start screen session
+        screen -dmS "$session_name" bash -c "$ssh_cmd"
+        print_success "Tunnel started in screen session '$session_name'"
+        print_status "Attaching to session (detach with Ctrl+A, then D)..."
+        sleep 2
+        screen -r "$session_name"
+    fi
+
+    return 0
+}
+
 # Handle first-run tunnel start
 if [[ "$FIRST_RUN_START_TUNNEL" == "true" ]]; then
     echo
@@ -673,6 +747,17 @@ case "$1" in
         if [[ ! -f ".tunnelcity_welcome_shown" ]] && [[ $? -eq 0 ]]; then
             echo
             print_success "Tunnel started in background!"
+            offer_quick_start_guide
+            touch ".tunnelcity_welcome_shown"
+        fi
+        ;;
+    "start-detach")
+        if check_tunnel_status; then
+            exit 1
+        fi
+        start_tunnel_detachable
+        # Offer documentation after detachable setup
+        if [[ ! -f ".tunnelcity_welcome_shown" ]]; then
             offer_quick_start_guide
             touch ".tunnelcity_welcome_shown"
         fi

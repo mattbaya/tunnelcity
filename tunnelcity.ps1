@@ -3,7 +3,7 @@
 
 param(
     [Parameter(Position=0)]
-    [ValidateSet("start", "start-bg", "stop", "status", "restart", "test", "docs", "help")]
+    [ValidateSet("start", "start-bg", "start-detach", "stop", "status", "restart", "test", "docs", "help")]
     [string]$Command = "help"
 )
 
@@ -533,6 +533,46 @@ function Start-Tunnel {
     return $true
 }
 
+# Function to start tunnel in a detachable session (Windows Terminal/PowerShell)
+function Start-TunnelDetachable {
+    Write-Status "Starting detachable SSH tunnel..."
+
+    # Windows doesn't have tmux/screen, but we can use Windows Terminal or start a new PowerShell window
+    $sessionName = "tunnelcity-$SSH_HOST"
+
+    Write-Status "Creating new PowerShell window for detachable session"
+    Write-Status "Local SOCKS proxy will be available on 127.0.0.1:$LOCAL_PORT"
+    Write-Host
+
+    # Create SSH command
+    $sshCmd = "ssh -D $LOCAL_PORT -C -N -i `"$SSH_KEY`" -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o LogLevel=ERROR -o UserKnownHostsFile=`"$($env:USERPROFILE)\.ssh\known_hosts`" -o StrictHostKeyChecking=yes `"$SSH_USER@$SSH_HOST`""
+
+    Write-Status "Creating detachable session..."
+    Write-Status "A new PowerShell window will open for the SSH tunnel"
+    Write-Status "Close that window or press Ctrl+C in it to stop the tunnel"
+    Write-Host
+
+    try {
+        # Try to use Windows Terminal if available, otherwise use regular PowerShell
+        if (Get-Command wt -ErrorAction SilentlyContinue) {
+            Write-Status "Using Windows Terminal..."
+            Start-Process wt -ArgumentList "new-tab", "--title", "TunnelCity SSH Tunnel", "powershell", "-NoExit", "-Command", $sshCmd
+        } else {
+            Write-Status "Using new PowerShell window..."
+            Start-Process powershell -ArgumentList "-NoExit", "-Command", $sshCmd
+        }
+
+        Write-Success "SSH tunnel started in new window"
+        Write-Status "The tunnel is running in the separate window"
+        return $true
+    }
+    catch {
+        Write-Error "Failed to start detachable tunnel: $($_.Exception.Message)"
+        Write-Status "Falling back to background mode..."
+        return Start-Tunnel -BackgroundMode $true
+    }
+}
+
 # Function to stop the tunnel
 function Stop-Tunnel {
     if (Test-Path $TUNNEL_PID_FILE) {
@@ -604,17 +644,18 @@ function Show-Status {
 # Function to show usage
 function Show-Usage {
     $scriptName = Split-Path $MyInvocation.ScriptName -Leaf
-    Write-Host "Usage: .$scriptName {start|start-bg|stop|status|restart|test|docs|help}"
+    Write-Host "Usage: .$scriptName {start|start-bg|start-detach|stop|status|restart|test|docs|help}"
     Write-Host ""
     Write-Host "Commands:"
-    Write-Host "  start     - Start tunnel in foreground (interactive mode)"
-    Write-Host "  start-bg  - Start tunnel in background"
-    Write-Host "  stop      - Stop the tunnel"
-    Write-Host "  status    - Show tunnel status"
-    Write-Host "  restart   - Restart the tunnel in background"
-    Write-Host "  test      - Test the tunnel connection"
-    Write-Host "  docs      - Show available documentation"
-    Write-Host "  help      - Show this help message"
+    Write-Host "  start        - Start tunnel in foreground (interactive mode)"
+    Write-Host "  start-bg     - Start tunnel in background"
+    Write-Host "  start-detach - Start tunnel in detachable window (Windows Terminal/PowerShell)"
+    Write-Host "  stop         - Stop the tunnel"
+    Write-Host "  status       - Show tunnel status"
+    Write-Host "  restart      - Restart the tunnel in background"
+    Write-Host "  test         - Test the tunnel connection"
+    Write-Host "  docs         - Show available documentation"
+    Write-Host "  help         - Show this help message"
     Write-Host ""
     Write-Host "Configuration:"
     Write-Host "  SSH User: $SSH_USER"
@@ -702,6 +743,17 @@ switch ($Command) {
         if (-not (Test-Path ".tunnelcity_welcome_shown") -and $result) {
             Write-Host
             Write-Success "Tunnel started in background!"
+            Show-QuickStartGuide
+            New-Item -Path ".tunnelcity_welcome_shown" -ItemType File -Force | Out-Null
+        }
+    }
+    "start-detach" {
+        if (Test-TunnelStatus) {
+            exit 1
+        }
+        $result = Start-TunnelDetachable
+        # Offer documentation after detachable setup
+        if (-not (Test-Path ".tunnelcity_welcome_shown") -and $result) {
             Show-QuickStartGuide
             New-Item -Path ".tunnelcity_welcome_shown" -ItemType File -Force | Out-Null
         }
