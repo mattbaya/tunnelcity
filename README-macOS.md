@@ -117,26 +117,6 @@ proxy_status() {
 }
 ```
 
-#### Method 3: Automating Proxy Toggle
-Create scripts for easy proxy management:
-
-**Enable Proxy Script** (`proxy-on.sh`):
-```bash
-#!/bin/bash
-# Get the primary network service
-SERVICE=$(networksetup -listnetworkserviceorder | grep -A1 "(1)" | tail -1 | sed 's/^(Hardware Port: .*, Device: .*)$//' | xargs)
-sudo networksetup -setsocksfirewallproxy "$SERVICE" 127.0.0.1 8080
-echo "✅ SOCKS proxy enabled on $SERVICE"
-```
-
-**Disable Proxy Script** (`proxy-off.sh`):
-```bash
-#!/bin/bash
-# Get the primary network service
-SERVICE=$(networksetup -listnetworkserviceorder | grep -A1 "(1)" | tail -1 | sed 's/^(Hardware Port: .*, Device: .*)$//' | xargs)
-sudo networksetup -setsocksfirewallproxystate "$SERVICE" off
-echo "❌ SOCKS proxy disabled on $SERVICE"
-```
 
 ### Application-Specific Configuration
 
@@ -184,56 +164,6 @@ echo "  ProxyCommand nc -X 5 -x 127.0.0.1:8080 %h %p" >> ~/.ssh/config
 ```
 
 
-## Network Change Handling
-
-### Automatic Reconnection
-For laptops that change networks frequently, consider:
-
-1. **Create a LaunchAgent** for automatic startup:
-```bash
-mkdir -p ~/Library/LaunchAgents
-
-cat > ~/Library/LaunchAgents/com.user.tunnelcity.plist << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.user.tunnelcity</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/path/to/tunnelcity.sh</string>
-        <string>start-bg</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <dict>
-        <key>NetworkState</key>
-        <true/>
-    </dict>
-</dict>
-</plist>
-EOF
-
-# Load the agent
-launchctl load ~/Library/LaunchAgents/com.user.tunnelcity.plist
-```
-
-2. **Network Location Automation**:
-   - System Preferences > Network > Location
-   - Create different locations for Home/Work/etc.
-   - Use scripts to auto-switch proxy settings per location
-
-### Manual Network Change Recovery
-When changing networks, you may need to:
-```bash
-# Stop and restart tunnel
-./tunnelcity.sh restart
-
-# Or use the new interactive menu (updated script)
-./tunnelcity.sh start  # Will show reconnection menu
-```
 
 ## Testing Your Setup
 
