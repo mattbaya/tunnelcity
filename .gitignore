@@ -1,6 +1,9 @@
 # Environment configuration
 .env
 
+# Institution-specific documentation
+SUMMARY.md
+
 # TunnelCity generated files
 .tunnelcity_welcome_shown
 
