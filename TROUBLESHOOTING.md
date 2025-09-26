@@ -84,25 +84,17 @@ sudo journalctl -u ssh -f
 sudo tail -f /var/log/auth.log
 ```
 
-#### 4. Use tcpdump/Wireshark for Network Analysis
-```bash
-# Capture traffic on the server (requires root)
-sudo tcpdump -i any -n port 22
-
-# Focus on refused connections
-sudo tcpdump -i any -n 'tcp[tcpflags] & tcp-rst != 0'
-```
 
 ### Reducing Refused Connections
 
 #### 1. Browser Configuration
-**Firefox**:
-- Set `network.proxy.socks_remote_dns` to `true` in about:config
-- This forces DNS resolution through the proxy
+**Firefox (Recommended)**:
+- Settings → Network Settings → Manual proxy configuration
+- Enable "Proxy DNS when using SOCKS v5" (forces DNS through proxy)
 
 **Chrome**:
-- Use `--host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE localhost"` flag
-- This prevents local DNS leaks
+- Launch with `--proxy-server="socks5://127.0.0.1:8080"`
+- Close all Chrome instances before launching with proxy
 
 #### 2. Application-Specific Configuration
 Configure apps to:
@@ -110,16 +102,6 @@ Configure apps to:
 - Exclude local/LAN addresses from proxy
 - Set appropriate timeout values
 
-#### 3. Server-Side Firewall Rules
-If you control the SSH server, ensure it can make outbound connections:
-```bash
-# Allow outbound HTTP/HTTPS
-sudo iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
-sudo iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
-
-# Allow DNS
-sudo iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-```
 
 ## Other Common Issues
 
@@ -166,9 +148,9 @@ ssh-add ~/.ssh/id_ed25519
 ### Network Changes (Laptops)
 **Symptoms**: Tunnel stops working after switching networks
 **Solutions**:
-- Use the interactive mode with reconnect option
-- Set up automatic restart scripts
-- Configure network-aware tunnel management
+- Restart the tunnel: `./tunnelcity.sh restart`
+- Test the connection: `./tunnelcity.sh test`
+- Use interactive mode for manual reconnection
 
 ## Getting Help
 
@@ -211,19 +193,3 @@ ssh -D 8080 -v user@server.com
 - System logs: `journalctl -u ssh`
 - User logs: `~/.ssh/` (if configured)
 
-## Performance Optimization
-
-### Reducing Connection Latency
-- Use compression: `-C` flag (already enabled)
-- Choose geographically closer servers
-- Use faster SSH ciphers: `-c aes128-gcm@openssh.com`
-
-### Bandwidth Management
-- Monitor data usage through the tunnel
-- Configure application-specific bandwidth limits
-- Consider tunnel compression trade-offs
-
-### Server Selection
-- Choose servers with good international connectivity
-- Prefer servers with minimal logging
-- Consider multiple backup servers
