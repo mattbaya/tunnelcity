@@ -58,9 +58,16 @@ SSH_KEY=~/.ssh/id_ed25519
 chmod +x tunnelcity.sh
 ```
 
-## System-Wide Proxy Configuration
+## Using the SOCKS5 Proxy
 
-### Method 1: Environment Variables (Session-based)
+Once your tunnel is running (`./tunnelcity.sh start-bg`), configure applications to use:
+- **Proxy Type**: SOCKS5
+- **Host**: 127.0.0.1
+- **Port**: 8080 (or your configured port)
+
+### System-Wide Proxy Configuration (Recommended)
+
+#### Method 1: Environment Variables (Session-based)
 ```bash
 # Enable SOCKS5 proxy for current session
 export ALL_PROXY=socks5://127.0.0.1:8080
@@ -77,7 +84,7 @@ unset ALL_PROXY all_proxy HTTPS_PROXY HTTP_PROXY https_proxy http_proxy
 env | grep -i proxy
 ```
 
-### Method 2: Shell Profile (Persistent)
+#### Method 2: Shell Profile (Persistent)
 Add to `~/.bashrc`, `~/.zshrc`, or `~/.profile`:
 
 ```bash
@@ -117,7 +124,7 @@ Then reload your shell:
 source ~/.bashrc  # or ~/.zshrc
 ```
 
-### Method 3: Desktop Environment Settings
+#### Method 3: Desktop Environment Settings
 
 #### GNOME (Ubuntu, Fedora, etc.)
 ```bash
@@ -158,44 +165,11 @@ gsettings get org.gnome.system.proxy.socks port
 2. Select **Manual proxy configuration**
 3. Set **SOCKS Host**: `127.0.0.1`, **Port**: `8080`
 
-### Method 4: System-Wide PAC File
-Create a Proxy Auto-Configuration file:
+**Important Notes**:
+- Environment variables (Method 1 & 2) work with most command-line applications
+- Desktop environment settings (Method 3) work with GUI applications that respect system proxy
+- Some applications may need individual configuration if they don't respect system settings
 
-```bash
-# Create PAC file
-cat > /tmp/proxy.pac << 'EOF'
-function FindProxyForURL(url, host) {
-    // Use SOCKS5 proxy for all connections
-    if (shExpMatch(host, "localhost") ||
-        shExpMatch(host, "127.*") ||
-        shExpMatch(host, "10.*") ||
-        shExpMatch(host, "172.16.*") ||
-        shExpMatch(host, "172.17.*") ||
-        shExpMatch(host, "172.18.*") ||
-        shExpMatch(host, "172.19.*") ||
-        shExpMatch(host, "172.20.*") ||
-        shExpMatch(host, "172.21.*") ||
-        shExpMatch(host, "172.22.*") ||
-        shExpMatch(host, "172.23.*") ||
-        shExpMatch(host, "172.24.*") ||
-        shExpMatch(host, "172.25.*") ||
-        shExpMatch(host, "172.26.*") ||
-        shExpMatch(host, "172.27.*") ||
-        shExpMatch(host, "172.28.*") ||
-        shExpMatch(host, "172.29.*") ||
-        shExpMatch(host, "172.30.*") ||
-        shExpMatch(host, "172.31.*") ||
-        shExpMatch(host, "192.168.*")) {
-        return "DIRECT";
-    }
-    return "SOCKS5 127.0.0.1:8080; SOCKS 127.0.0.1:8080; DIRECT";
-}
-EOF
-
-# Set PAC file for GNOME
-gsettings set org.gnome.system.proxy mode 'auto'
-gsettings set org.gnome.system.proxy autoconfig-url "file:///tmp/proxy.pac"
-```
 
 ## Application-Specific Configuration
 
@@ -227,19 +201,19 @@ EOF
 
 ### Browsers
 
-#### Firefox
+**Firefox (Recommended - Best SOCKS5 Support)**
 1. **Preferences** > **Network Settings**
 2. Select **Manual proxy configuration**
 3. **SOCKS Host**: `127.0.0.1`, **Port**: `8080`
 4. Select **SOCKS v5**
 5. Check **Proxy DNS when using SOCKS v5**
 
-#### Chrome/Chromium
+**Chrome/Chromium**
 ```bash
 # Launch with SOCKS proxy
 google-chrome --proxy-server="socks5://127.0.0.1:8080"
 
-# Create desktop entry
+# Create desktop entry for convenience
 cat > ~/.local/share/applications/chrome-proxy.desktop << 'EOF'
 [Desktop Entry]
 Name=Chrome (Proxy)
@@ -250,106 +224,8 @@ Categories=Network;WebBrowser;
 EOF
 ```
 
-### Third-Party Proxy Tools
+**Note**: Firefox has the best native SOCKS5 support of all browsers.
 
-#### ProxyChains (Force any application through proxy)
-```bash
-# Install
-sudo apt install proxychains4  # Ubuntu/Debian
-sudo dnf install proxychains-ng  # Fedora
-sudo pacman -S proxychains-ng   # Arch
-
-# Configure /etc/proxychains4.conf
-echo "socks5 127.0.0.1 8080" | sudo tee -a /etc/proxychains4.conf
-
-# Usage
-proxychains4 firefox
-proxychains4 curl https://ifconfig.me
-```
-
-#### Tsocks (Transparent SOCKS proxy)
-```bash
-# Install
-sudo apt install tsocks
-
-# Configure /etc/tsocks.conf
-echo "server = 127.0.0.1" | sudo tee -a /etc/tsocks.conf
-echo "server_port = 8080" | sudo tee -a /etc/tsocks.conf
-echo "server_type = 5" | sudo tee -a /etc/tsocks.conf
-
-# Usage
-tsocks firefox
-```
-
-## Advanced Configuration
-
-### Automatic Proxy Scripts
-Create scripts for easy proxy management:
-
-**proxy-toggle.sh**:
-```bash
-#!/bin/bash
-
-STATUS_FILE="/tmp/tunnelcity_proxy_status"
-
-if [ -f "$STATUS_FILE" ]; then
-    # Proxy is on, turn it off
-    unset ALL_PROXY all_proxy HTTPS_PROXY HTTP_PROXY https_proxy http_proxy
-    rm -f "$STATUS_FILE"
-
-    # Disable GNOME proxy if available
-    if command -v gsettings >/dev/null 2>&1; then
-        gsettings set org.gnome.system.proxy mode 'none'
-    fi
-
-    echo "❌ Proxy disabled"
-else
-    # Proxy is off, turn it on
-    export ALL_PROXY=socks5://127.0.0.1:8080
-    export all_proxy=socks5://127.0.0.1:8080
-    export HTTPS_PROXY=socks5://127.0.0.1:8080
-    export HTTP_PROXY=socks5://127.0.0.1:8080
-    export https_proxy=socks5://127.0.0.1:8080
-    export http_proxy=socks5://127.0.0.1:8080
-
-    touch "$STATUS_FILE"
-
-    # Enable GNOME proxy if available
-    if command -v gsettings >/dev/null 2>&1; then
-        gsettings set org.gnome.system.proxy mode 'manual'
-        gsettings set org.gnome.system.proxy.socks host '127.0.0.1'
-        gsettings set org.gnome.system.proxy.socks port 8080
-    fi
-
-    echo "✅ Proxy enabled"
-fi
-```
-
-### Systemd Service for Auto-start
-```bash
-# Create systemd user service
-mkdir -p ~/.config/systemd/user
-
-cat > ~/.config/systemd/user/tunnelcity.service << 'EOF'
-[Unit]
-Description=TunnelCity SSH Tunnel
-After=network-online.target
-
-[Service]
-Type=forking
-ExecStart=/path/to/tunnelcity.sh start-bg
-ExecStop=/path/to/tunnelcity.sh stop
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-EOF
-
-# Enable and start
-systemctl --user enable tunnelcity.service
-systemctl --user start tunnelcity.service
-```
 
 ## Testing Your Setup
 
