@@ -31,10 +31,10 @@ function Write-Error {
 # Function to show OS-specific quick start guide
 function Show-QuickStartGuide {
     Write-Host
-    Write-Status "✨ Next Steps - System Proxy Configuration"
+    Write-Status "Next Steps - System Proxy Configuration"
     Write-Host
 
-    Write-Host "🧪 Windows Quick Setup:" -ForegroundColor Cyan
+    Write-Host "Windows Quick Setup:" -ForegroundColor Cyan
     Write-Host "  1. Settings > Network & Internet > Proxy"
     Write-Host "  2. Enable 'Use a proxy server'"
     Write-Host "  3. Address: 127.0.0.1, Port: $LOCAL_PORT"
@@ -43,7 +43,7 @@ function Show-QuickStartGuide {
     Write-Host "  Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyEnable -Value 1"
     Write-Host
 
-    $viewDetailed = Read-Host "📚 View detailed setup guide? [y/N]"
+    $viewDetailed = Read-Host "View detailed setup guide? [y/N]"
     if ($viewDetailed -match '^[Yy]$') {
         if (Test-Path "README-Windows11.md") {
             Write-Status "Opening detailed Windows setup guide..."
@@ -60,8 +60,8 @@ function Show-QuickStartGuide {
             Write-Status "For detailed setup: https://github.com/mattbaya/tunnelcity"
         }
     } else {
-        Write-Status "📌 Tip: Run '$(Split-Path $MyInvocation.ScriptName -Leaf) docs' anytime for detailed guides"
-        Write-Status "🌐 Online: https://github.com/mattbaya/tunnelcity"
+        Write-Status "Tip: Run '$(Split-Path $MyInvocation.ScriptName -Leaf) docs' anytime for detailed guides"
+        Write-Status "Online: https://github.com/mattbaya/tunnelcity"
     }
     Write-Host
 }
@@ -71,7 +71,7 @@ function Show-Documentation {
     Write-Host
     Write-Status "TunnelCity Documentation"
     Write-Host
-    Write-Host "📚 Available Documentation:" -ForegroundColor Yellow
+    Write-Host "Available Documentation:" -ForegroundColor Yellow
     Write-Host
 
     if (Test-Path "README.md") {
@@ -165,7 +165,7 @@ function Request-Configuration {
     Write-Host
 
     # Offer to start tunnel immediately
-    Write-Status "🚀 Configuration complete! Ready to start your SSH tunnel."
+    Write-Status "> Configuration complete! Ready to start your SSH tunnel."
     Write-Host
     $startTunnelNow = Read-Host "Would you like to start the tunnel now? [Y/n]"
 
