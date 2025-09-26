@@ -164,17 +164,17 @@ TunnelCity includes comprehensive guides for configuring **system-wide proxies**
 - **Shell Functions**: Easy proxy toggle scripts
 - **Network Location**: Automatic proxy switching
 
-### 🪟 **Windows System Proxy** ([README-Windows11.md](README-Windows11.md))
+### 🪟 **Windows System Proxy** ([README-Windows.md](README-Windows.md))
 - **GUI**: Settings > Network & Internet > Proxy
 - **PowerShell**: Registry-based proxy management functions
-- **Automation**: Scripts for easy enable/disable
-- **Third-party Tools**: Proxifier, SocksCap64 recommendations
+- **Browser Configuration**: Chrome and Firefox setup
+- **Comprehensive Setup**: OpenSSH Client installation and configuration
 
 ### 🐧 **Linux System Proxy** ([README-Linux.md](README-Linux.md))
 - **Environment Variables**: Export proxy settings system-wide
 - **Desktop Environments**: GNOME, KDE, XFCE configuration
-- **PAC Files**: Advanced proxy auto-configuration
-- **ProxyChains**: Force any application through the tunnel
+- **Shell Functions**: Easy proxy toggle commands
+- **Browser Configuration**: Firefox and Chrome setup
 
 ### Quick OS Proxy Commands:
 
@@ -215,7 +215,7 @@ unset ALL_PROXY
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
 
-See [README-Windows11.md](README-Windows11.md) for detailed Windows setup instructions and **system-wide proxy configuration**.
+See [README-Windows.md](README-Windows.md) for detailed Windows setup instructions and **system-wide proxy configuration**.
 
 ### macOS Requirements
 
