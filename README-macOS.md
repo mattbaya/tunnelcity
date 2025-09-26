@@ -51,9 +51,26 @@ Once your tunnel is running (`./tunnelcity.sh start-bg`), configure applications
 - **Host**: 127.0.0.1
 - **Port**: 8080 (or your configured port)
 
-### System-Wide Proxy Configuration
+### 🚀 Quick Setup - Most Reliable Methods
 
-#### Method 1: System Preferences GUI
+**1. System-wide Proxy (Recommended):**
+```bash
+# Enable SOCKS proxy on Wi-Fi
+sudo networksetup -setsocksfirewallproxy "Wi-Fi" 127.0.0.1 8080
+
+# Disable when done
+sudo networksetup -setsocksfirewallproxystate "Wi-Fi" off
+```
+
+**2. System Preferences GUI (Recommended):**
+System Preferences → Network → Advanced → Proxies → SOCKS Proxy → `127.0.0.1:8080`
+
+**3. Firefox (Best SOCKS5 Support):**
+Firefox → Preferences → Network Settings → Manual proxy → SOCKS Host: `127.0.0.1:8080` → SOCKS v5
+
+### System-Wide Proxy Configuration (Recommended)
+
+#### Method 1: System Preferences GUI (Recommended)
 1. Open **System Preferences** > **Network**
 2. Select your active network connection (Wi-Fi or Ethernet)
 3. Click **Advanced..** > **Proxies** tab
@@ -166,24 +183,6 @@ echo "Host github.com" >> ~/.ssh/config
 echo "  ProxyCommand nc -X 5 -x 127.0.0.1:8080 %h %p" >> ~/.ssh/config
 ```
 
-### Third-Party Proxy Tools
-
-#### Proxyman (GUI Proxy Manager)
-- Download: https://proxyman.io/
-- Easy switching between proxy configurations
-- Visual traffic inspection
-
-#### ProxyChains (Command Line)
-```bash
-# Install via Homebrew
-brew install proxychains-ng
-
-# Configure /usr/local/etc/proxychains.conf
-echo "socks5 127.0.0.1 8080" >> /usr/local/etc/proxychains.conf
-
-# Use with any command
-proxychains4 curl https://ifconfig.me
-```
 
 ## Network Change Handling
 
