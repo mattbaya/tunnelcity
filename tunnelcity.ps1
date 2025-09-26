@@ -7,6 +7,27 @@ param(
     [string]$Command = "help"
 )
 
+# Function to write colored output (must be defined before use)
+function Write-Status {
+    param([string]$Message)
+    Write-Host "[INFO] $Message" -ForegroundColor Blue
+}
+
+function Write-Success {
+    param([string]$Message)
+    Write-Host "[SUCCESS] $Message" -ForegroundColor Green
+}
+
+function Write-Warning {
+    param([string]$Message)
+    Write-Host "[WARNING] $Message" -ForegroundColor Yellow
+}
+
+function Write-Error {
+    param([string]$Message)
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
+}
+
 # Function to show OS-specific quick start guide
 function Show-QuickStartGuide {
     Write-Host
@@ -212,26 +233,6 @@ if ($FirstRunStartTunnel -eq $true) {
     exit 0
 }
 
-# Function to write colored output
-function Write-Status {
-    param([string]$Message)
-    Write-Host "[INFO] $Message" -ForegroundColor Blue
-}
-
-function Write-Success {
-    param([string]$Message)
-    Write-Host "[SUCCESS] $Message" -ForegroundColor Green
-}
-
-function Write-Warning {
-    param([string]$Message)
-    Write-Host "[WARNING] $Message" -ForegroundColor Yellow
-}
-
-function Write-Error {
-    param([string]$Message)
-    Write-Host "[ERROR] $Message" -ForegroundColor Red
-}
 
 # Function to check if SSH command is available
 function Test-SshAvailable {
