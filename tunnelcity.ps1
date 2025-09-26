@@ -362,7 +362,7 @@ function Test-PortConflicts {
                         }
                     }
                     catch {
-                        Write-Error "Error processing PID $pid: $($PSItem.Exception.Message)"
+                        Write-Error "Error processing PID ${pid}: $($PSItem.Exception.Message)"
                     }
                 }
             }
