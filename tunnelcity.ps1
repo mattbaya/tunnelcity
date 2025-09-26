@@ -154,13 +154,11 @@ function Request-Configuration {
     $sshKey = $sshKey -replace '^~', $env:USERPROFILE
 
     # Create .env file
-    $envContent = @"
-# SSH Tunnel Configuration
-SSH_USER=$sshUser
-SSH_HOST=$sshHost
-LOCAL_PORT=$localPort
-SSH_KEY=$sshKey
-"@
+    $envContent = "# SSH Tunnel Configuration`n"
+    $envContent += "SSH_USER=$sshUser`n"
+    $envContent += "SSH_HOST=$sshHost`n"
+    $envContent += "LOCAL_PORT=$localPort`n"
+    $envContent += "SSH_KEY=$sshKey`n"
 
     Set-Content -Path ".env" -Value $envContent -Encoding UTF8
     Write-Success "Configuration saved to .env file"
