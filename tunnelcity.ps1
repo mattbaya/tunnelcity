@@ -227,7 +227,7 @@ function Test-PortConflicts {
         Write-Host
         Write-Warning "Port $LOCAL_PORT is already in use!"
         Write-Host
-        Write-Host "Processes using port $LOCAL_PORT:"
+        Write-Host "Processes using port ${LOCAL_PORT}:"
 
         $conflictsFound = $false
         foreach ($pid in $processInfo) {
