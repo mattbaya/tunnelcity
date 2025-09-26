@@ -178,58 +178,6 @@ function Request-Configuration {
     }
 }
 
-# Load configuration from .env file or prompt user
-$FirstRunStartTunnel = $false
-if (Test-Path ".env") {
-    Get-Content ".env" | ForEach-Object {
-        if ($_ -match '^(.+?)=(.*)$' -and $_ -notmatch '^\s*#') {
-            Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
-        }
-    }
-} else {
-    Request-Configuration
-    Get-Content ".env" | ForEach-Object {
-        if ($_ -match '^(.+?)=(.*)$' -and $_ -notmatch '^\s*#') {
-            Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
-        }
-    }
-}
-
-# Configuration with defaults
-$SSH_USER = if ($SSH_USER) { $SSH_USER } else { "user" }
-$SSH_HOST = if ($SSH_HOST) { $SSH_HOST } else { "server.com" }
-$LOCAL_PORT = if ($LOCAL_PORT) { $LOCAL_PORT } else { "8080" }
-$SSH_KEY = if ($SSH_KEY) { $SSH_KEY } else { "~/.ssh/id_ed25519" }
-
-# Expand ~ to user profile in SSH key path
-$SSH_KEY = $SSH_KEY -replace '^~', $env:USERPROFILE
-$TUNNEL_PID_FILE = "$env:TEMP\ssh_tunnel_$SSH_HOST.pid"
-
-# Handle first-run tunnel start
-if ($FirstRunStartTunnel -eq $true) {
-    Write-Host
-    Write-Status "Starting your tunnel in background mode..."
-    Write-Host
-
-    # Check for existing tunnels
-    if (Test-TunnelStatus) {
-        Write-Warning "A tunnel is already running. Use '$(Split-Path $MyInvocation.ScriptName -Leaf) status' to check details."
-        exit 0
-    }
-
-    # Start the tunnel
-    $result = Start-Tunnel -BackgroundMode $true
-    if ($result) {
-        Write-Host
-        Write-Success "Tunnel started successfully!"
-        Show-QuickStartGuide
-        New-Item -Path ".tunnelcity_welcome_shown" -ItemType File -Force | Out-Null
-    } else {
-        Write-Error "Failed to start tunnel. Check the error messages above."
-        exit 1
-    }
-    exit 0
-}
 
 
 # Function to check if SSH command is available
@@ -718,6 +666,59 @@ function Test-Tunnel {
         Write-Error "Tunnel test failed: $($PSItem.Exception.Message)"
         return $false
     }
+}
+
+# Load configuration from .env file or prompt user
+$FirstRunStartTunnel = $false
+if (Test-Path ".env") {
+    Get-Content ".env" | ForEach-Object {
+        if ($_ -match '^(.+?)=(.*)$' -and $_ -notmatch '^\s*#') {
+            Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
+        }
+    }
+} else {
+    Request-Configuration
+    Get-Content ".env" | ForEach-Object {
+        if ($_ -match '^(.+?)=(.*)$' -and $_ -notmatch '^\s*#') {
+            Set-Variable -Name $matches[1] -Value $matches[2] -Scope Script
+        }
+    }
+}
+
+# Configuration with defaults
+$SSH_USER = if ($SSH_USER) { $SSH_USER } else { "user" }
+$SSH_HOST = if ($SSH_HOST) { $SSH_HOST } else { "server.com" }
+$LOCAL_PORT = if ($LOCAL_PORT) { $LOCAL_PORT } else { "8080" }
+$SSH_KEY = if ($SSH_KEY) { $SSH_KEY } else { "~/.ssh/id_ed25519" }
+
+# Expand ~ to user profile in SSH key path
+$SSH_KEY = $SSH_KEY -replace '^~', $env:USERPROFILE
+$TUNNEL_PID_FILE = "$env:TEMP\ssh_tunnel_$SSH_HOST.pid"
+
+# Handle first-run tunnel start
+if ($FirstRunStartTunnel -eq $true) {
+    Write-Host
+    Write-Status "Starting your tunnel in background mode..."
+    Write-Host
+
+    # Check for existing tunnels
+    if (Test-TunnelStatus) {
+        Write-Warning "A tunnel is already running. Use '$(Split-Path $MyInvocation.ScriptName -Leaf) status' to check details."
+        exit 0
+    }
+
+    # Start the tunnel
+    $result = Start-Tunnel -BackgroundMode $true
+    if ($result) {
+        Write-Host
+        Write-Success "Tunnel started successfully!"
+        Show-QuickStartGuide
+        New-Item -Path ".tunnelcity_welcome_shown" -ItemType File -Force | Out-Null
+    } else {
+        Write-Error "Failed to start tunnel. Check the error messages above."
+        exit 1
+    }
+    exit 0
 }
 
 # Main script logic
